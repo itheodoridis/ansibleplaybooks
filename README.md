@@ -1,0 +1,1 @@
+This is a collection of playbooks to share mostly for linux server administration in the context of OSS Network Management tools

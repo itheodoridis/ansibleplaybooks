@@ -1,0 +1,79 @@
+---
+- name: check for syslog-ng
+  hosts: "{{ target_host }}"
+  become: true
+
+  # check for the apt package
+  tasks:
+  - name: check and install syslog-ng apt package
+    apt:
+      name: 
+        - syslog-ng
+    become: true
+
+  # check if the config file is there (if just installed syslog-ng, it shouldn't be)
+  - name: check if config file exists
+    stat:
+      path: "/etc/syslog-ng/conf.d/loki.conf"
+    become: true
+    register: lokifile
+
+  # debug print to see if file exists during execution
+  - name: Print if Loki Conf File Exists
+    debug:
+      var: lokifile.stat.exists
+
+  # if file does not exist (previous check) go ahead and create it
+  - name: create config file
+    file:
+      path: /etc/syslog-ng/conf.d/loki.conf
+      state: touch
+    register: lokifile_created
+    when: not lokifile.stat.exists
+
+  # debug print to see if file was created during execution (only if it didn't exist)
+  - name: print lokifile_created
+    debug:
+      var: lokifile_created.changed
+    #when: not lokifile.stat.exists
+
+  # if file exists or was created check for destination
+  - name: check destination for loki
+    lineinfile:
+      path: /etc/syslog-ng/conf.d/loki.conf
+      regexp: '^destination d_loki'
+      line: 'destination d_loki {syslog("srv-nwlog-02.bankofgreece.gr" transport("tcp") port(1514)); };'
+    become: true
+    register: destchanged
+    when: (lokifile.stat.exists or lokifile_created.changed)
+
+  # debug print to see if destination changed
+  - name: print destchanged
+    debug:
+      var: destchanged.changed
+    when: (lokifile.stat.exists or lokifile_created.changed)
+
+  # if file exists or was created check for source route
+  - name: check log route from source to destination
+    lineinfile:
+      path: /etc/syslog-ng/conf.d/loki.conf
+      regexp: '^log { source(s_src)'
+      line: 'log { source(s_src); destination(d_loki); };'
+    become: true
+    register: sourceroute
+    when: (lokifile.stat.exists or lokifile_created.changed)
+
+  # debug print to see if source route changed
+  - name: print sourceroute
+    debug:
+      var: sourceroute.changed
+    when: (lokifile.stat.exists or lokifile_created.changed)
+
+  # restart if anything was changed, no need to check if the file is there.
+  - name: Restart syslog-ng service
+    service:
+      name: syslog-ng
+      state: restarted
+    become: true
+    when: (destchanged.changed or sourceroute.changed)
+
