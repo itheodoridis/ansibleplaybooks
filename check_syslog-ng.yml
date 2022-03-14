@@ -42,7 +42,7 @@
     lineinfile:
       path: /etc/syslog-ng/conf.d/loki.conf
       regexp: '^destination d_loki'
-      line: 'destination d_loki {syslog("{{loki_server}}" transport("tcp") port(1514)); };'
+      line: 'destination d_loki {syslog("{{ loki_server }}" transport("tcp") port(1514)); };'
     become: true
     register: destchanged
     when: (lokifile.stat.exists or lokifile_created.changed)
